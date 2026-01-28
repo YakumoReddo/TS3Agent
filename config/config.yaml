@@ -1,0 +1,72 @@
+# TS3 AI Agent 配置文件
+# 请根据实际情况修改各项配置
+
+# TCP 服务器配置
+tcp:
+  host: "localhost"
+  port: 9001
+
+# Riva ASR 配置
+riva_asr:
+  server: "grpc.nvcf.nvidia.com:443"
+  use_ssl: true
+  language_code: "zh-CN"
+  keys:
+    - "your_nvidia_api_key_1"
+    - "your_nvidia_api_key_2"
+  metadata:
+    - 'function-id: b702f636-f60c-4a3d-a6f4-f3568c13bd7d'
+    - 'authorization: Bearer {key}'
+
+# Riva TTS 配置
+riva_tts:
+  server: "grpc.nvcf.nvidia.com:443"
+  use_ssl: true
+  language_code: "zh-CN"
+  voice_name: ""
+  zero_shot_audio_prompt_file: "resources/audio/prompt.wav"
+  keys:
+    - "your_nvidia_api_key_1"
+    - "your_nvidia_api_key_2"
+  metadata:
+    - 'function-id: b702f636-f60c-4a3d-a6f4-f3568c13bd7d'
+    - 'authorization: Bearer {key}'
+
+# OpenAI 兼容 API 配置（Qwen 2.5 B）
+openai_api:
+  base_url: "https://dashscope.aliyuncs.com/compatible-mode/v1"
+  model: "qwen-max"
+  keys:
+    - "your_dashscope_api_key_1"
+    - "your_dashscope_api_key_2"
+  timeout: 60
+  max_tokens: 4096
+
+# 唤醒词配置
+wakeword:
+  path: "resources/wakeword/hey_jarvis.ppn"
+  sensitivity: 0.7
+
+# 预设音频路径
+audio_files:
+  wakeup_alert: "resources/audio/wakeup_alert.flac"
+  processing: "resources/audio/processing.flac"
+  error: "resources/audio/error.flac"
+
+# 用户会话配置
+session:
+  max_users: 10
+  idle_timeout: 300
+  post_wakeup_window: 3.0
+  command_end_gap: 1.0
+
+# 动作系统配置
+actions:
+  max_nesting_depth: 3
+  nested_timeout: 30
+  custom_actions_dir: "custom_actions"
+
+# 日志配置
+logging:
+  level: "INFO"
+  file: "logs/agent.log"
