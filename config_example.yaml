@@ -1,0 +1,97 @@
+# AI Agent Configuration Example
+# Copy this file to config.yaml and modify as needed
+
+# TCP Server Configuration
+tcp_server:
+  host: "localhost"
+  port: 9001
+
+# User Thread Pool Settings
+user_pool:
+  max_users: 10  # Maximum number of concurrent user processing threads
+  idle_timeout: 300  # Seconds of silence before releasing user thread
+
+# Wake Word Detection Settings
+wake_word:
+  # Porcupine access key from Picovoice Console
+  access_key: "YOUR_PORCUPINE_ACCESS_KEY"
+  # Path to custom keyword file (.ppn) or use built-in keywords
+  keyword_paths:
+    - "/path/to/wake_word.ppn"
+  # Or use built-in keywords (e.g., "porcupine", "alexa", "hey google")
+  # keywords:
+  #   - "porcupine"
+  sensitivity: 0.5  # 0.0 to 1.0, higher = more sensitive but more false positives
+
+# Command Recording Timing Settings
+command_timing:
+  # Grace period after wake word detection (seconds)
+  # User has this much time to start speaking
+  grace_period: 3.0
+  # Silence duration to end command recording (seconds)
+  # After detecting speech, this much silence ends recording
+  silence_threshold: 1.0
+  # Maximum command duration (seconds)
+  max_duration: 30.0
+
+# Riva ASR Settings
+riva_asr:
+  server: "grpc.nvcf.nvidia.com:443"
+  use_ssl: true
+  language_code: "zh-CN"  # or "en-US"
+  # Function ID for NVIDIA Cloud Functions (if using NVCF)
+  function_id: "b702f636-f60c-4a3d-a6f4-f3568c13bd7d"
+  # API keys for rotation (will cycle through on errors)
+  api_keys:
+    - "YOUR_NVIDIA_API_KEY_1"
+    - "YOUR_NVIDIA_API_KEY_2"
+
+# Riva TTS Settings
+riva_tts:
+  server: "grpc.nvcf.nvidia.com:443"
+  use_ssl: true
+  language_code: "zh-CN"
+  voice_name: null  # Use default voice if null
+  sample_rate_hz: 48000
+  # Zero-shot voice cloning settings (optional)
+  zero_shot_audio_prompt_file: null  # Path to reference audio (3-10 seconds)
+  zero_shot_quality: 20
+  # API keys (same as ASR or different)
+  api_keys:
+    - "YOUR_NVIDIA_API_KEY_1"
+
+# LLM API Settings (OpenAI-compatible)
+llm:
+  api_base: "https://api.openai.com/v1"
+  model: "qwen-235b"  # or "gpt-4", etc.
+  # API keys for rotation
+  api_keys:
+    - "YOUR_OPENAI_API_KEY_1"
+    - "YOUR_OPENAI_API_KEY_2"
+  max_tokens: 2048
+  temperature: 0.7
+
+# Agent Prompt File
+agent:
+  prompt_file: "Agent.md"  # Path to the agent prompt file
+
+# Preset Audio Files
+preset_audio:
+  wake_confirmation: "/path/to/wake_confirmation.wav"  # Played when wake word detected
+  error: "/path/to/error.wav"  # Played on errors
+  thinking: "/path/to/thinking.wav"  # Played while processing (optional)
+
+# Custom Actions Directory
+# Python scripts in this directory can be called as actions
+custom_actions_dir: "actions_scripts"
+
+# Action System Settings
+action_system:
+  max_nesting_depth: 3  # Maximum depth for nested actions
+  action_timeout: 30.0  # Timeout for each action (seconds)
+  nested_action_timeout: 60.0  # Total timeout for nested action chains
+
+# Logging Settings
+logging:
+  level: "INFO"  # DEBUG, INFO, WARNING, ERROR
+  file: "agent.log"  # Log file path, null for stdout only
