@@ -75,6 +75,14 @@ llm:
 agent:
   prompt_file: "Agent.md"  # Path to the agent prompt file
 
+# Localized Messages
+# These messages are spoken to users for various events
+messages:
+  error_transcription: "Sorry, I couldn't understand that."
+  error_llm: "Sorry, I encountered an error processing your request."
+  error_general: "Sorry, an error occurred while processing your command."
+  wake_confirmation: "Yes?"
+
 # Preset Audio Files
 preset_audio:
   wake_confirmation: "/path/to/wake_confirmation.wav"  # Played when wake word detected

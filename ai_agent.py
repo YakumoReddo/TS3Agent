@@ -168,6 +168,17 @@ class AIAgent:
             ))
             logger.addHandler(handler)
     
+    def _get_message(self, key: str) -> str:
+        """Get a localized message from config."""
+        messages = self.config.get('messages', {})
+        defaults = {
+            'error_transcription': "Sorry, I couldn't understand that.",
+            'error_llm': "Sorry, I encountered an error processing your request.",
+            'error_general': "Sorry, an error occurred while processing your command.",
+            'wake_confirmation': "Yes?",
+        }
+        return messages.get(key, defaults.get(key, key))
+    
     def _load_agent_prompt(self) -> str:
         """Load the agent prompt from file."""
         prompt_file = Path(self.config.get('agent', {}).get('prompt_file', 'Agent.md'))
@@ -471,9 +482,9 @@ class AIAgent:
                 self._finish_command_recording(user)
                 return
             
-            # Note: Silence detection would require VAD
-            # For simplicity, we rely on the timing after wake word
-            # Real implementation should use VAD to detect silence
+            # Silence is detected in _monitor_command_timeout by checking
+            # the time since last audio packet. This is a simple approach
+            # that works when users stop speaking entirely.
             
         else:
             # Check wake word
@@ -586,7 +597,7 @@ class AIAgent:
             
             if not transcript:
                 logger.warning(f"User {user_id}: No transcript from ASR")
-                self._speak("Sorry, I couldn't understand that.")
+                self._speak(self._get_message('error_transcription'))
                 return
             
             logger.info(f"User {user_id}: Transcript: {transcript}")
@@ -596,7 +607,7 @@ class AIAgent:
             
             if not llm_response:
                 logger.error(f"User {user_id}: No response from LLM")
-                self._speak("Sorry, I encountered an error processing your request.")
+                self._speak(self._get_message('error_llm'))
                 return
             
             logger.info(f"User {user_id}: LLM response received")
@@ -610,7 +621,7 @@ class AIAgent:
             
         except Exception as e:
             logger.error(f"Error processing command: {e}")
-            self._speak("Sorry, an error occurred while processing your command.")
+            self._speak(self._get_message('error_general'))
     
     def _transcribe_audio(self, audio_path: str) -> Optional[str]:
         """Transcribe audio using Riva ASR."""
@@ -786,8 +797,8 @@ class AIAgent:
         if wake_file and Path(wake_file).exists():
             self.send_audio_file(wake_file)
         else:
-            # Fallback: speak a short confirmation
-            self._speak("Yes?")
+            # Fallback: speak a short confirmation using configurable message
+            self._speak(self._get_message('wake_confirmation'))
     
     def _initialize_action_executor(self) -> None:
         """Initialize the action executor."""
