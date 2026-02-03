@@ -115,9 +115,14 @@ def test_wake_word(
         keyword_names = keywords
     else:
         # Extract names from paths
+        # Porcupine .ppn files follow naming convention: keyword_platform_version.ppn
+        # e.g., "hey_siri_mac_v2_1_0.ppn" -> "hey siri"
+        # Files with more than 6 underscore-separated parts have multi-word keywords
         keyword_names = []
         for p in keyword_paths:
             name_parts = os.path.basename(p).replace('.ppn', '').split('_')
+            # Last 6 parts are typically: platform_major_minor_patch (e.g., mac_v2_1_0)
+            # If more than 6 parts exist, the keyword is multi-word
             if len(name_parts) > 6:
                 keyword_names.append(' '.join(name_parts[0:-6]))
             else:

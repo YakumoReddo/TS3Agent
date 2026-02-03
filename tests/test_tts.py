@@ -22,6 +22,9 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "python-clients"))
 
 import yaml
 
+# Constants
+DEFAULT_ZERO_SHOT_QUALITY = 20
+
 
 def test_tts(
     server: str,
@@ -247,8 +250,8 @@ Examples:
     parser.add_argument(
         "--zero-shot-quality",
         type=int,
-        default=20,
-        help="Zero-shot quality (1-40, default: 20)"
+        default=DEFAULT_ZERO_SHOT_QUALITY,
+        help=f"Zero-shot quality (1-40, default: {DEFAULT_ZERO_SHOT_QUALITY})"
     )
     parser.add_argument(
         "--no-ssl",
@@ -300,8 +303,8 @@ Examples:
                 use_ssl = tts_config.get('use_ssl', True)
             if not zero_shot_audio:
                 zero_shot_audio = tts_config.get('zero_shot_audio_prompt_file')
-            if args.zero_shot_quality == 20:  # default
-                zero_shot_quality = tts_config.get('zero_shot_quality', 20)
+            if args.zero_shot_quality == DEFAULT_ZERO_SHOT_QUALITY:
+                zero_shot_quality = tts_config.get('zero_shot_quality', DEFAULT_ZERO_SHOT_QUALITY)
             
             print(f"Loaded configuration from: {args.config}")
         else:

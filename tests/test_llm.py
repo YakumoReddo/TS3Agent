@@ -47,6 +47,8 @@ def test_llm(
     max_tokens: int = 2048,
     temperature: float = 0.7,
     user_id: int = 1,
+    preset_audio_files: str = "None",
+    custom_scripts: str = "None",
     verbose: bool = False
 ) -> dict:
     """
@@ -61,6 +63,8 @@ def test_llm(
         max_tokens: Max tokens in response
         temperature: Sampling temperature
         user_id: Simulated user ID
+        preset_audio_files: Available preset audio files (for prompt)
+        custom_scripts: Available custom scripts (for prompt)
         verbose: Print verbose output
         
     Returns:
@@ -91,8 +95,8 @@ def test_llm(
         system_prompt = agent_prompt.format(
             user_id=user_id,
             timestamp=datetime.now().isoformat(),
-            preset_audio_files="test_audio, notification",
-            custom_scripts="system_info, example_timer"
+            preset_audio_files=preset_audio_files,
+            custom_scripts=custom_scripts
         )
     else:
         system_prompt = """You are an AI assistant. Respond in JSON format with actions.
@@ -301,6 +305,8 @@ Examples:
     max_tokens = args.max_tokens or 2048
     temperature = args.temperature or 0.7
     prompt_file = args.prompt_file
+    preset_audio_files = "None"
+    custom_scripts = "None"
     
     if args.config:
         config_path = Path(args.config)
@@ -327,6 +333,24 @@ Examples:
             agent_config = config.get('agent', {})
             if 'prompt_file' in agent_config:
                 prompt_file = agent_config.get('prompt_file', 'Agent.md')
+            
+            # Load preset audio files from config
+            preset_audio_config = config.get('preset_audio', {})
+            preset_audio_dir = preset_audio_config.get('directory')
+            if preset_audio_dir:
+                preset_dir = Path(preset_audio_dir)
+                if preset_dir.exists():
+                    audio_files = [f.stem for f in preset_dir.iterdir() 
+                                   if f.suffix.lower() in {'.wav', '.mp3', '.flac', '.ogg'}]
+                    preset_audio_files = ', '.join(audio_files) if audio_files else "None"
+            
+            # Load custom scripts from config
+            custom_actions_dir = config.get('custom_actions_dir')
+            if custom_actions_dir:
+                scripts_dir = Path(custom_actions_dir)
+                if scripts_dir.exists():
+                    scripts = [f.stem for f in scripts_dir.glob("*.py")]
+                    custom_scripts = ', '.join(scripts) if scripts else "None"
             
             print(f"Loaded configuration from: {args.config}")
         else:
@@ -358,6 +382,8 @@ Examples:
         max_tokens=max_tokens,
         temperature=temperature,
         user_id=args.user_id,
+        preset_audio_files=preset_audio_files,
+        custom_scripts=custom_scripts,
         verbose=args.verbose
     )
     

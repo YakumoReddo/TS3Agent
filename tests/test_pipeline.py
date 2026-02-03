@@ -268,13 +268,34 @@ def test_pipeline(
                 prompt_file = config.get('agent', {}).get('prompt_file', 'Agent.md')
                 prompt_path = Path(__file__).parent.parent / prompt_file
                 agent_prompt = ""
+                
+                # Load preset audio files from config
+                preset_audio_files = "None"
+                preset_audio_config = config.get('preset_audio', {})
+                preset_audio_dir = preset_audio_config.get('directory')
+                if preset_audio_dir:
+                    preset_dir = Path(preset_audio_dir)
+                    if preset_dir.exists():
+                        audio_files = [f.stem for f in preset_dir.iterdir() 
+                                       if f.suffix.lower() in {'.wav', '.mp3', '.flac', '.ogg'}]
+                        preset_audio_files = ', '.join(audio_files) if audio_files else "None"
+                
+                # Load custom scripts from config
+                custom_scripts = "None"
+                custom_actions_dir = config.get('custom_actions_dir')
+                if custom_actions_dir:
+                    scripts_dir = Path(__file__).parent.parent / custom_actions_dir
+                    if scripts_dir.exists():
+                        scripts = [f.stem for f in scripts_dir.glob("*.py")]
+                        custom_scripts = ', '.join(scripts) if scripts else "None"
+                
                 if prompt_path.exists():
                     agent_prompt = prompt_path.read_text(encoding='utf-8')
                     agent_prompt = agent_prompt.format(
                         user_id=1,
                         timestamp=datetime.now().isoformat(),
-                        preset_audio_files="None",
-                        custom_scripts="system_info, example_timer"
+                        preset_audio_files=preset_audio_files,
+                        custom_scripts=custom_scripts
                     )
                 
                 response = client.chat.completions.create(
