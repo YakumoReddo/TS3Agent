@@ -373,41 +373,71 @@ Usage Statistics
 
 ### 功能说明
 
-测试 Riva TTS 服务是否能正确将文本合成为语音。
+测试 TTS 服务是否能正确将文本合成为语音。支持两个平台：
+- **Riva**: NVIDIA Riva TTS
+- **Doubao**: 字节跳动豆包 TTS
 
 ### 使用方法
 
 ```bash
-# 使用配置文件
+# 使用配置文件 (自动选择配置中的平台)
 python tests/test_tts.py --config config.yaml --text "你好，世界"
+
+# 指定使用 Riva TTS
+python tests/test_tts.py --config config.yaml --platform riva --text "你好，世界"
+
+# 指定使用 Doubao TTS
+python tests/test_tts.py --config config.yaml --platform doubao --text "你好，世界"
 
 # 保存输出音频
 python tests/test_tts.py --config config.yaml --text "Hello, world" --output test_output.wav
 
-# 使用直接参数
-python tests/test_tts.py --server grpc.nvcf.nvidia.com:443 --api-key YOUR_KEY \
+# Riva 直接参数
+python tests/test_tts.py --platform riva --server grpc.nvcf.nvidia.com:443 --api-key YOUR_KEY \
     --language en-US --text "Hello" --output output.wav
+
+# Doubao 直接参数
+python tests/test_tts.py --platform doubao --doubao-appid YOUR_APPID --doubao-cluster YOUR_CLUSTER \
+    --doubao-voice-type YOUR_VOICE_TYPE --api-key YOUR_TOKEN --text "你好" --output output.mp3
 ```
 
 ### 参数说明
+
+#### 通用参数
 
 | 参数 | 说明 |
 |------|------|
 | `--config, -c` | 配置文件路径 |
 | `--text, -t` | 要合成的文本 (必需) |
-| `--output, -o` | 输出 WAV 文件路径 |
-| `--server` | Riva 服务器地址 |
+| `--output, -o` | 输出文件路径 |
+| `--platform` | TTS 平台: riva 或 doubao |
 | `--api-key` | API 密钥 |
+| `--verbose, -v` | 详细输出 |
+
+#### Riva 专用参数
+
+| 参数 | 说明 |
+|------|------|
+| `--server` | Riva 服务器地址 |
 | `--language` | 语言代码 |
 | `--voice` | 音色名称 |
 | `--sample-rate` | 采样率 (Hz) |
 | `--zero-shot-audio` | Zero-shot 音频提示文件 |
-| `--verbose, -v` | 详细输出 |
+
+#### Doubao 专用参数
+
+| 参数 | 说明 |
+|------|------|
+| `--doubao-appid` | Doubao 应用 ID |
+| `--doubao-cluster` | Doubao 集群 |
+| `--doubao-voice-type` | Doubao 音色类型 ID |
 
 ### 预期结果
 
-**成功情况：**
+#### Riva TTS 成功情况
 ```
+Using TTS platform: riva
+
 TTS (Text-to-Speech) Test
 ============================================================
 
@@ -438,12 +468,44 @@ Saving to: test_output.wav
 ✓ TTS test completed successfully
 ```
 
+#### Doubao TTS 成功情况
+```
+Using TTS platform: doubao
+
+Doubao TTS (Text-to-Speech) Test
+============================================================
+
+Configuration:
+  - API URL: https://openspeech.bytedance.com/api/v1/tts
+  - App ID: your_appid
+  - Cluster: your_cluster
+  - Voice Type: your_voice_type
+  - Encoding: mp3
+
+Input Text: 你好，世界
+
+Sending request to Doubao TTS...
+  Response received in 0.65 seconds
+
+Results
+============================================================
+  Audio size: 15360 bytes (15.0 KB)
+  Encoding: mp3
+
+Saving to: test_output.mp3
+  ✓ Saved successfully
+
+✓ TTS test completed successfully
+```
+
 ### 故障排查
 
 | 问题 | 可能原因 | 解决方案 |
 |------|----------|----------|
-| 连接失败 | 网络或服务器问题 | 检查服务器地址和网络 |
-| 输出静音 | 文本或语言代码问题 | 确保文本和语言匹配 |
+| Riva 连接失败 | 网络或服务器问题 | 检查服务器地址和网络 |
+| Riva 输出静音 | 文本或语言代码问题 | 确保文本和语言匹配 |
+| Doubao 认证失败 | access_token 无效 | 检查 API 密钥 |
+| Doubao 无音频 | appid/cluster/voice_type 错误 | 检查配置参数 |
 
 ---
 

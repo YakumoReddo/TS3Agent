@@ -86,6 +86,32 @@ riva_tts:
   api_keys:
     - "YOUR_NVIDIA_API_KEY_1"
 
+# Doubao (ByteDance) TTS Settings
+# Alternative TTS platform from ByteDance
+doubao_tts:
+  # API endpoint
+  host: "openspeech.bytedance.com"
+  api_url: "https://openspeech.bytedance.com/api/v1/tts"
+  # Authentication
+  appid: "YOUR_DOUBAO_APPID"
+  cluster: "YOUR_DOUBAO_CLUSTER"
+  # Voice settings
+  voice_type: "YOUR_VOICE_TYPE"  # Voice type ID from Doubao console
+  # Audio settings
+  encoding: "mp3"  # Output format: mp3, wav, pcm, ogg
+  speed_ratio: 1.0  # Speed ratio (0.5-2.0)
+  volume_ratio: 1.0  # Volume ratio (0.5-2.0)
+  pitch_ratio: 1.0  # Pitch ratio (0.5-2.0)
+  # API keys (access tokens) for rotation
+  api_keys:
+    - "YOUR_DOUBAO_ACCESS_TOKEN_1"
+    - "YOUR_DOUBAO_ACCESS_TOKEN_2"
+
+# TTS Platform Selection
+# Choose which TTS platform to use
+tts:
+  platform: "riva"  # Options: "riva", "doubao"
+
 # LLM API Settings (OpenAI-compatible)
 llm:
   api_base: "https://api.openai.com/v1"

@@ -151,6 +151,7 @@ class AIAgent:
         # Initialize API key rotators
         self.asr_keys = KeyRotator(self.config.get('riva_asr', {}).get('api_keys', []))
         self.tts_keys = KeyRotator(self.config.get('riva_tts', {}).get('api_keys', []))
+        self.doubao_tts_keys = KeyRotator(self.config.get('doubao_tts', {}).get('api_keys', []))
         self.llm_keys = KeyRotator(self.config.get('llm', {}).get('api_keys', []))
         
         # User states - keyed by user_id
@@ -200,6 +201,10 @@ class AIAgent:
         logger.info(f"Wake Word:    {self.audio_config.wake_word_sample_rate}Hz, {self.audio_config.wake_word_channels}ch (Porcupine)")
         logger.info(f"ASR:          {self.audio_config.asr_sample_rate}Hz, {self.audio_config.asr_channels}ch")
         logger.info(f"TTS Output:   {self.audio_config.tts_sample_rate}Hz, {self.audio_config.tts_channels}ch")
+        
+        # Log TTS platform
+        tts_platform = self.config.get('tts', {}).get('platform', 'riva')
+        logger.info(f"TTS Platform: {tts_platform}")
         
         # Log resampling info if needed
         if self.audio_config.tcp_sample_rate != self.audio_config.wake_word_sample_rate:
@@ -860,7 +865,22 @@ class AIAgent:
             return None
     
     def _synthesize_speech(self, text: str) -> Optional[bytes]:
-        """Synthesize speech using Riva TTS."""
+        """
+        Synthesize speech using the configured TTS platform.
+        
+        Supports:
+        - riva: NVIDIA Riva TTS
+        - doubao: ByteDance Doubao TTS
+        """
+        tts_platform = self.config.get('tts', {}).get('platform', 'riva')
+        
+        if tts_platform == 'doubao':
+            return self._synthesize_speech_doubao(text)
+        else:
+            return self._synthesize_speech_riva(text)
+    
+    def _synthesize_speech_riva(self, text: str) -> Optional[bytes]:
+        """Synthesize speech using NVIDIA Riva TTS."""
         tts_config = self.config.get('riva_tts', {})
         
         try:
@@ -869,7 +889,7 @@ class AIAgent:
             
             api_key = self.tts_keys.get_key()
             if not api_key:
-                logger.error("No TTS API key available")
+                logger.error("No Riva TTS API key available")
                 return None
             
             # Create metadata
@@ -905,8 +925,129 @@ class AIAgent:
             return response.audio
             
         except Exception as e:
-            logger.error(f"TTS error: {e}")
+            logger.error(f"Riva TTS error: {e}")
             self.tts_keys.rotate()
+            return None
+    
+    def _synthesize_speech_doubao(self, text: str) -> Optional[bytes]:
+        """Synthesize speech using ByteDance Doubao TTS."""
+        import base64
+        import uuid
+        import requests
+        import io
+        
+        tts_config = self.config.get('doubao_tts', {})
+        
+        try:
+            api_key = self.doubao_tts_keys.get_key()
+            if not api_key:
+                logger.error("No Doubao TTS API key available")
+                return None
+            
+            appid = tts_config.get('appid', '')
+            cluster = tts_config.get('cluster', '')
+            voice_type = tts_config.get('voice_type', '')
+            api_url = tts_config.get('api_url', 'https://openspeech.bytedance.com/api/v1/tts')
+            encoding = tts_config.get('encoding', 'mp3')
+            
+            if not appid or not cluster or not voice_type:
+                logger.error("Doubao TTS: Missing appid, cluster, or voice_type in config")
+                return None
+            
+            # Build request
+            # Note: Authorization header uses "Bearer;" format per Doubao API specification
+            header = {"Authorization": f"Bearer;{api_key}"}
+            
+            request_json = {
+                "app": {
+                    "appid": appid,
+                    # Note: token field is a fixed string per Doubao API docs, not the actual access token
+                    "token": "access_token",
+                    "cluster": cluster
+                },
+                "user": {
+                    "uid": "ai_agent_user"
+                },
+                "audio": {
+                    "voice_type": voice_type,
+                    "encoding": encoding,
+                    "speed_ratio": tts_config.get('speed_ratio', 1.0),
+                    "volume_ratio": tts_config.get('volume_ratio', 1.0),
+                    "pitch_ratio": tts_config.get('pitch_ratio', 1.0),
+                },
+                "request": {
+                    "reqid": str(uuid.uuid4()),
+                    "text": text,
+                    "text_type": "plain",
+                    "operation": "query",
+                    "with_frontend": 1,
+                    "frontend_type": "unitTson"
+                }
+            }
+            
+            # Make request
+            resp = requests.post(api_url, json=request_json, headers=header, timeout=30)
+            resp_json = resp.json()
+            
+            if "data" not in resp_json:
+                logger.error(f"Doubao TTS error: {resp_json.get('message', 'No data in response')}")
+                self.doubao_tts_keys.rotate()
+                return None
+            
+            # Decode audio data
+            audio_data = base64.b64decode(resp_json["data"])
+            
+            # If encoding is mp3, we need to convert to PCM for playback
+            if encoding == 'mp3':
+                try:
+                    from pydub import AudioSegment
+                    audio = AudioSegment.from_mp3(io.BytesIO(audio_data))
+                    # Convert to raw PCM
+                    audio = audio.set_frame_rate(self.audio_config.tts_sample_rate)
+                    audio = audio.set_channels(self.audio_config.tts_channels)
+                    audio = audio.set_sample_width(2)  # 16-bit
+                    audio_data = audio.raw_data
+                except ImportError:
+                    logger.warning("pydub not available, trying soundfile as alternative")
+                    # Try using soundfile as alternative
+                    try:
+                        import soundfile as sf
+                        import numpy as np
+                        audio_array, sr = sf.read(io.BytesIO(audio_data))
+                        # Resample if needed
+                        if sr != self.audio_config.tts_sample_rate:
+                            try:
+                                import librosa
+                                audio_array = librosa.resample(audio_array, orig_sr=sr, target_sr=self.audio_config.tts_sample_rate)
+                            except ImportError:
+                                pass
+                        # Convert to int16
+                        audio_data = (np.clip(audio_array, -1.0, 1.0) * 32767).astype(np.int16).tobytes()
+                    except ImportError:
+                        logger.error("Cannot convert mp3 to PCM: install pydub or soundfile")
+                        return None
+            elif encoding == 'pcm':
+                # PCM data can be used directly
+                pass
+            elif encoding == 'wav':
+                # Extract raw PCM from WAV
+                try:
+                    import wave
+                    with wave.open(io.BytesIO(audio_data), 'rb') as wav:
+                        audio_data = wav.readframes(wav.getnframes())
+                except Exception as e:
+                    logger.error(f"Failed to read WAV data: {e}")
+                    return None
+            
+            return audio_data
+            
+        except requests.RequestException as e:
+            logger.error(f"Doubao TTS request error: {e}")
+            self.doubao_tts_keys.rotate()
+            return None
+        except Exception as e:
+            logger.error(f"Doubao TTS error: {e}")
+            self.doubao_tts_keys.rotate()
             return None
     
     def _speak(self, text: str) -> None:

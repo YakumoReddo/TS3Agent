@@ -136,6 +136,10 @@ audio:
     sample_rate: 48000
     channels: 1
 
+# TTS Platform Selection
+tts:
+  platform: "riva"  # Options: "riva", "doubao"
+
 # Wake word settings
 wake_word:
   access_key: "YOUR_PORCUPINE_ACCESS_KEY"
@@ -155,6 +159,59 @@ riva_asr:
   language_code: "zh-CN"
   api_keys:
     - "YOUR_API_KEY"
+
+# Riva TTS (when tts.platform = "riva")
+riva_tts:
+  server: "grpc.nvcf.nvidia.com:443"
+  language_code: "zh-CN"
+  api_keys:
+    - "YOUR_API_KEY"
+
+# Doubao TTS (when tts.platform = "doubao")
+doubao_tts:
+  appid: "YOUR_DOUBAO_APPID"
+  cluster: "YOUR_DOUBAO_CLUSTER"
+  voice_type: "YOUR_VOICE_TYPE"
+  api_keys:
+    - "YOUR_DOUBAO_ACCESS_TOKEN"
+```
+
+### TTS Platform Options
+
+The agent supports two TTS platforms:
+
+#### 1. NVIDIA Riva TTS (default)
+
+```yaml
+tts:
+  platform: "riva"
+
+riva_tts:
+  server: "grpc.nvcf.nvidia.com:443"
+  use_ssl: true
+  language_code: "zh-CN"
+  sample_rate_hz: 48000
+  api_keys:
+    - "YOUR_NVIDIA_API_KEY"
+```
+
+#### 2. ByteDance Doubao TTS
+
+```yaml
+tts:
+  platform: "doubao"
+
+doubao_tts:
+  api_url: "https://openspeech.bytedance.com/api/v1/tts"
+  appid: "YOUR_DOUBAO_APPID"
+  cluster: "YOUR_DOUBAO_CLUSTER"
+  voice_type: "YOUR_VOICE_TYPE_ID"
+  encoding: "mp3"  # mp3, wav, pcm
+  speed_ratio: 1.0
+  volume_ratio: 1.0
+  pitch_ratio: 1.0
+  api_keys:
+    - "YOUR_DOUBAO_ACCESS_TOKEN"
 ```
 
 ### Audio Sample Rate Notes
@@ -164,7 +221,12 @@ riva_asr:
 - **ASR (48kHz)**: Riva ASR works well with 48kHz audio
 - **TTS (48kHz)**: TTS output is generated at the configured sample rate
 
-At startup, the agent logs all audio settings for debugging:
+At startup, the agent logs all audio settings and TTS platform for debugging:
+
+```
+INFO - Audio Configuration
+INFO - TTS Platform: riva
+```
 
 ## Action System
 
