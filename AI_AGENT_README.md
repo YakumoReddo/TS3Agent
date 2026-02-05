@@ -121,6 +121,21 @@ python ai_agent.py --config config.yaml
 See `config_example.yaml` for all available options. Key settings include:
 
 ```yaml
+# Audio settings for each component
+audio:
+  tcp_input:
+    sample_rate: 48000  # TS3AudioBot sends 48kHz audio
+    channels: 1
+  wake_word:
+    sample_rate: 16000  # Porcupine requires 16kHz (auto-resampled)
+    channels: 1
+  asr:
+    sample_rate: 48000  # ASR can use 48kHz
+    channels: 1
+  tts:
+    sample_rate: 48000
+    channels: 1
+
 # Wake word settings
 wake_word:
   access_key: "YOUR_PORCUPINE_ACCESS_KEY"
@@ -141,6 +156,15 @@ riva_asr:
   api_keys:
     - "YOUR_API_KEY"
 ```
+
+### Audio Sample Rate Notes
+
+- **TCP Input (48kHz)**: Audio from TS3AudioBot is Opus-encoded at 48kHz
+- **Wake Word (16kHz)**: Porcupine requires 16kHz mono audio. The agent automatically resamples from 48kHz to 16kHz
+- **ASR (48kHz)**: Riva ASR works well with 48kHz audio
+- **TTS (48kHz)**: TTS output is generated at the configured sample rate
+
+At startup, the agent logs all audio settings for debugging:
 
 ## Action System
 

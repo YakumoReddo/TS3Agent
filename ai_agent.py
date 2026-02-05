@@ -53,9 +53,32 @@ PACKET_COMMAND = 3
 CODEC_OPUS_VOICE = 4  # Mono, 48kHz
 CODEC_OPUS_MUSIC = 5  # Stereo, 48kHz
 
-# Audio Constants
-SAMPLE_RATE = 48000
+# Default Audio Constants (can be overridden by config)
+DEFAULT_TCP_SAMPLE_RATE = 48000
+DEFAULT_TCP_CHANNELS = 1
+DEFAULT_WAKE_WORD_SAMPLE_RATE = 16000  # Porcupine requires 16kHz
+DEFAULT_WAKE_WORD_CHANNELS = 1         # Porcupine requires mono
+DEFAULT_ASR_SAMPLE_RATE = 48000
+DEFAULT_ASR_CHANNELS = 1
+DEFAULT_TTS_SAMPLE_RATE = 48000
+DEFAULT_TTS_CHANNELS = 1
+
+# Legacy constant for backward compatibility
+SAMPLE_RATE = DEFAULT_TCP_SAMPLE_RATE
 OPUS_FRAME_SIZE = 960  # 20ms at 48kHz
+
+
+@dataclass
+class AudioConfig:
+    """Audio configuration for each pipeline component."""
+    tcp_sample_rate: int = DEFAULT_TCP_SAMPLE_RATE
+    tcp_channels: int = DEFAULT_TCP_CHANNELS
+    wake_word_sample_rate: int = DEFAULT_WAKE_WORD_SAMPLE_RATE
+    wake_word_channels: int = DEFAULT_WAKE_WORD_CHANNELS
+    asr_sample_rate: int = DEFAULT_ASR_SAMPLE_RATE
+    asr_channels: int = DEFAULT_ASR_CHANNELS
+    tts_sample_rate: int = DEFAULT_TTS_SAMPLE_RATE
+    tts_channels: int = DEFAULT_TTS_CHANNELS
 
 
 @dataclass
@@ -64,7 +87,7 @@ class UserState:
     user_id: int
     # Porcupine wake word detector (created per-user)
     porcupine: Any = None
-    # Audio buffer for wake word detection
+    # Audio buffer for wake word detection (resampled to 16kHz)
     wake_buffer: List[int] = field(default_factory=list)
     # Command recording state
     is_recording_command: bool = False
@@ -122,6 +145,9 @@ class AIAgent:
         # Setup logging
         self._setup_logging()
         
+        # Load audio configuration
+        self.audio_config = self._load_audio_config()
+        
         # Initialize API key rotators
         self.asr_keys = KeyRotator(self.config.get('riva_asr', {}).get('api_keys', []))
         self.tts_keys = KeyRotator(self.config.get('riva_tts', {}).get('api_keys', []))
@@ -144,6 +170,43 @@ class AIAgent:
         
         # Load agent prompt
         self.agent_prompt = self._load_agent_prompt()
+    
+    def _load_audio_config(self) -> AudioConfig:
+        """Load audio configuration from config file."""
+        audio_cfg = self.config.get('audio', {})
+        
+        tcp_cfg = audio_cfg.get('tcp_input', {})
+        wake_cfg = audio_cfg.get('wake_word', {})
+        asr_cfg = audio_cfg.get('asr', {})
+        tts_cfg = audio_cfg.get('tts', {})
+        
+        return AudioConfig(
+            tcp_sample_rate=tcp_cfg.get('sample_rate', DEFAULT_TCP_SAMPLE_RATE),
+            tcp_channels=tcp_cfg.get('channels', DEFAULT_TCP_CHANNELS),
+            wake_word_sample_rate=wake_cfg.get('sample_rate', DEFAULT_WAKE_WORD_SAMPLE_RATE),
+            wake_word_channels=wake_cfg.get('channels', DEFAULT_WAKE_WORD_CHANNELS),
+            asr_sample_rate=asr_cfg.get('sample_rate', DEFAULT_ASR_SAMPLE_RATE),
+            asr_channels=asr_cfg.get('channels', DEFAULT_ASR_CHANNELS),
+            tts_sample_rate=tts_cfg.get('sample_rate', DEFAULT_TTS_SAMPLE_RATE),
+            tts_channels=tts_cfg.get('channels', DEFAULT_TTS_CHANNELS),
+        )
+    
+    def _log_audio_config(self) -> None:
+        """Log audio configuration at startup."""
+        logger.info("=" * 60)
+        logger.info("Audio Configuration")
+        logger.info("=" * 60)
+        logger.info(f"TCP Input:    {self.audio_config.tcp_sample_rate}Hz, {self.audio_config.tcp_channels}ch")
+        logger.info(f"Wake Word:    {self.audio_config.wake_word_sample_rate}Hz, {self.audio_config.wake_word_channels}ch (Porcupine)")
+        logger.info(f"ASR:          {self.audio_config.asr_sample_rate}Hz, {self.audio_config.asr_channels}ch")
+        logger.info(f"TTS Output:   {self.audio_config.tts_sample_rate}Hz, {self.audio_config.tts_channels}ch")
+        
+        # Log resampling info if needed
+        if self.audio_config.tcp_sample_rate != self.audio_config.wake_word_sample_rate:
+            logger.info(f"Resampling:   TCP ({self.audio_config.tcp_sample_rate}Hz) -> Wake Word ({self.audio_config.wake_word_sample_rate}Hz)")
+        if self.audio_config.tcp_sample_rate != self.audio_config.asr_sample_rate:
+            logger.info(f"Resampling:   TCP ({self.audio_config.tcp_sample_rate}Hz) -> ASR ({self.audio_config.asr_sample_rate}Hz)")
+        logger.info("=" * 60)
     
     def _load_config(self, config_path: str) -> dict:
         """Load configuration from YAML file."""
@@ -223,14 +286,50 @@ class AIAgent:
     def _create_opus_decoder(self, channels: int = 1) -> Any:
         """Create an Opus decoder."""
         import opuslib
-        return opuslib.Decoder(SAMPLE_RATE, channels)
+        return opuslib.Decoder(self.audio_config.tcp_sample_rate, channels)
     
     def _create_opus_encoder(self, channels: int = 2) -> Any:
         """Create an Opus encoder for sending audio."""
         import opuslib
-        encoder = opuslib.Encoder(SAMPLE_RATE, channels, opuslib.APPLICATION_AUDIO)
+        encoder = opuslib.Encoder(self.audio_config.tcp_sample_rate, channels, opuslib.APPLICATION_AUDIO)
         encoder.bitrate = 96000
         return encoder
+    
+    def _resample_audio(self, samples: List[int], from_rate: int, to_rate: int) -> List[int]:
+        """
+        Resample audio from one sample rate to another.
+        
+        Args:
+            samples: Input audio samples as list of int16
+            from_rate: Source sample rate
+            to_rate: Target sample rate
+            
+        Returns:
+            Resampled audio samples as list of int16
+        """
+        if from_rate == to_rate:
+            return samples
+        
+        import numpy as np
+        
+        # Convert to numpy array
+        audio = np.array(samples, dtype=np.float32) / 32768.0
+        
+        # Resample audio
+        # For better quality, use librosa.resample if available
+        try:
+            import librosa
+            resampled = librosa.resample(audio, orig_sr=from_rate, target_sr=to_rate)
+        except ImportError:
+            # Fallback to simple linear interpolation
+            ratio = to_rate / from_rate
+            new_length = int(len(audio) * ratio)
+            indices = np.linspace(0, len(audio) - 1, new_length)
+            resampled = np.interp(indices, np.arange(len(audio)), audio)
+        
+        # Convert back to int16
+        resampled_int16 = (np.clip(resampled, -1.0, 1.0) * 32767).astype(np.int16)
+        return resampled_int16.tolist()
     
     def _get_or_create_user(self, user_id: int) -> Optional[UserState]:
         """Get or create a user state."""
@@ -438,7 +537,7 @@ class AIAgent:
         
         with user.lock:
             try:
-                # Decode Opus to PCM
+                # Decode Opus to PCM (at TCP sample rate)
                 pcm_data = user.decoder.decode(audio_data, OPUS_FRAME_SIZE)
                 
                 # Convert to int16 samples
@@ -455,12 +554,12 @@ class AIAgent:
         """
         Process audio samples for a user.
         Handles wake word detection and command recording.
+        
+        Note: Input samples are at TCP sample rate (48kHz).
+        For wake word detection, audio is resampled to 16kHz.
         """
         current_time = time.time()
         user.last_audio_time = current_time
-        
-        # Add samples to wake buffer
-        user.wake_buffer.extend(samples)
         
         timing_config = self.config.get('command_timing', {})
         grace_period = timing_config.get('grace_period', 3.0)
@@ -468,7 +567,7 @@ class AIAgent:
         max_duration = timing_config.get('max_duration', 30.0)
         
         if user.is_recording_command:
-            # Recording command - add audio
+            # Recording command - add audio at TCP sample rate (for ASR)
             # Convert samples back to bytes
             sample_array = array.array('h', samples)
             user.command_audio.append(sample_array.tobytes())
@@ -487,6 +586,16 @@ class AIAgent:
             # that works when users stop speaking entirely.
             
         else:
+            # Resample audio from TCP rate to Porcupine rate (16kHz) for wake word detection
+            resampled_samples = self._resample_audio(
+                samples, 
+                self.audio_config.tcp_sample_rate, 
+                self.audio_config.wake_word_sample_rate
+            )
+            
+            # Add resampled samples to wake buffer
+            user.wake_buffer.extend(resampled_samples)
+            
             # Check wake word
             frame_length = user.porcupine.frame_length
             
@@ -580,13 +689,28 @@ class AIAgent:
         logger.info(f"User {user_id}: Processing command ({len(audio_data)} bytes)")
         
         try:
+            # Resample audio if ASR sample rate differs from TCP sample rate
+            if self.audio_config.asr_sample_rate != self.audio_config.tcp_sample_rate:
+                # Convert bytes to samples
+                samples = array.array('h')
+                samples.frombytes(audio_data)
+                # Resample
+                resampled = self._resample_audio(
+                    list(samples),
+                    self.audio_config.tcp_sample_rate,
+                    self.audio_config.asr_sample_rate
+                )
+                # Convert back to bytes
+                resampled_array = array.array('h', resampled)
+                audio_data = resampled_array.tobytes()
+            
             # Save audio to temp file for ASR
             with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as f:
                 temp_path = f.name
                 with wave.open(f, 'wb') as wav:
-                    wav.setnchannels(1)
+                    wav.setnchannels(self.audio_config.asr_channels)
                     wav.setsampwidth(2)
-                    wav.setframerate(SAMPLE_RATE)
+                    wav.setframerate(self.audio_config.asr_sample_rate)
                     wav.writeframes(audio_data)
             
             # Transcribe
@@ -856,6 +980,9 @@ class AIAgent:
     def run(self) -> None:
         """Main run loop."""
         logger.info("AI Agent starting...")
+        
+        # Log audio configuration at startup
+        self._log_audio_config()
         
         # Initialize action executor
         self._initialize_action_executor()

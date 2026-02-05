@@ -6,6 +6,32 @@ tcp_server:
   host: "localhost"
   port: 9001
 
+# Audio Settings for Each Component
+# These settings control sample rate and channels for different pipeline stages
+audio:
+  # TCP input audio settings (from TS3AudioBot)
+  # TS3AudioBot sends Opus-encoded audio at 48kHz
+  tcp_input:
+    sample_rate: 48000  # Sample rate of incoming TCP audio
+    channels: 1         # Number of channels (1=mono, 2=stereo)
+  
+  # Wake word detection (Porcupine) audio settings
+  # Porcupine REQUIRES 16kHz mono audio - do not change these values
+  wake_word:
+    sample_rate: 16000  # Porcupine requires 16kHz
+    channels: 1         # Porcupine requires mono
+  
+  # ASR (Speech Recognition) audio settings
+  asr:
+    sample_rate: 48000  # Sample rate for ASR input
+    channels: 1         # Channels for ASR input
+  
+  # TTS (Text-to-Speech) output settings
+  # This is also configured in riva_tts.sample_rate_hz
+  tts:
+    sample_rate: 48000  # Sample rate for TTS output
+    channels: 1         # Channels for TTS output
+
 # User Thread Pool Settings
 user_pool:
   max_users: 10  # Maximum number of concurrent user processing threads
