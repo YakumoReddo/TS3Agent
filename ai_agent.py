@@ -832,12 +832,14 @@ class AIAgent:
             preset_audio = self.action_executor.get_available_preset_audio() if self.action_executor else []
             custom_scripts = self.action_executor.get_available_scripts() if self.action_executor else []
             
-            system_prompt = system_prompt.format(
-                user_id=user_id,
-                timestamp=datetime.now().isoformat(),
-                preset_audio_files=', '.join(preset_audio) if preset_audio else 'None',
-                custom_scripts=', '.join(custom_scripts) if custom_scripts else 'None'
-            )
+            system_prompt = system_prompt.replace("{user_id}", str(user_id)).replace("{timestamp}", datetime.now().isoformat()).replace("{preset_audio_files}", ', '.join(preset_audio) if preset_audio else 'None').replace("{custom_scripts}", ', '.join(custom_scripts) if custom_scripts else 'None')   
+            
+            # system_prompt = system_prompt.format(
+            #     user_id=user_id,
+            #     timestamp=datetime.now().isoformat(),
+            #     preset_audio_files=', '.join(preset_audio) if preset_audio else 'None',
+            #     custom_scripts=', '.join(custom_scripts) if custom_scripts else 'None'
+            # )
             
             # Call LLM
             response = client.chat.completions.create(
